@@ -55,7 +55,7 @@ function App() {
   return (
     <main className="container">
       <section className="hero">
-        <h1>Mini HelpDesk App</h1>
+        <h1>Mini HelpDesk App - Exam Practice</h1>
         <p>Practice project: branches, Docker, Docker Hub, Terraform, Load Balancer and ASG.</p>
         <span className="badge">Health: {health}</span>
       </section>
