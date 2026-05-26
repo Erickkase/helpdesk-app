@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: helpdesk-postgres
+    environment:
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: helpdesk123
+      POSTGRES_DB: helpdeskdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpdesk -d helpdeskdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: helpdesk-backend
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://helpdesk:helpdesk123@postgres:5432/helpdeskdb
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: helpdesk-frontend
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
