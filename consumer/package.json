@@ -1,16 +1,14 @@
 {
-  "name": "helpdesk-backend",
+  "name": "helpdesk-consumer",
   "version": "1.0.0",
-  "description": "Mini HelpDesk backend for exam practice",
+  "description": "Kafka consumer for HelpDesk events",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
     "kafkajs": "^2.2.4",
     "pg": "^8.12.0"
   },

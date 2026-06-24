@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelpDesk - Prueba Kafka</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; color: #e94560; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .card { background: #16213e; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { color: #e94560; margin-bottom: 15px; font-size: 1.2em; }
+    label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9em; }
+    input, select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #333; border-radius: 5px; background: #0f3460; color: #eee; font-size: 1em; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 1em; cursor: pointer; font-weight: bold; }
+    .btn-create { background: #e94560; color: white; }
+    .btn-create:hover { background: #c73652; }
+    .btn-status { background: #0f3460; color: white; border: 1px solid #e94560; }
+    .btn-status:hover { background: #1a4a8a; }
+    .btn-refresh { background: #533483; color: white; }
+    .btn-refresh:hover { background: #6b44a0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #333; }
+    th { color: #e94560; }
+    .status-pending { color: #f39c12; }
+    .status-in_progress { color: #3498db; }
+    .status-resolved { color: #2ecc71; }
+    #result { margin-top: 15px; padding: 15px; background: #0f3460; border-radius: 5px; display: none; word-wrap: break-word; }
+    .success { border-left: 4px solid #2ecc71; }
+    .error { border-left: 4px solid #e94560; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>HelpDesk - Prueba Kafka</h1>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Crear Ticket (Productor)</h2>
+        <label>Título</label>
+        <input type="text" id="title" placeholder="Ej: Problema con impresora">
+        <label>Descripción</label>
+        <input type="text" id="description" placeholder="Ej: No imprime documentos">
+        <button class="btn-create" onclick="createTicket()">Crear Ticket</button>
+      </div>
+
+      <div class="card">
+        <h2>Cambiar Estado (Productor)</h2>
+        <label>Ticket ID</label>
+        <input type="number" id="ticketId" placeholder="Ej: 1">
+        <label>Nuevo Estado</label>
+        <select id="status">
+          <option value="pending">Pendiente</option>
+          <option value="in_progress">En Progreso</option>
+          <option value="resolved">Resuelto</option>
+        </select>
+        <button class="btn-status" onclick="updateStatus()">Actualizar Estado</button>
+      </div>
+    </div>
+
+    <div id="result"></div>
+
+    <div class="card">
+      <h2>Eventos Kafka (Consumidor)</h2>
+      <button class="btn-refresh" onclick="loadEvents()">Recargar Eventos</button>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Evento</th>
+            <th>Ticket</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="eventsTable">
+          <tr><td colspan="4">Cargando eventos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Tickets</h2>
+      <button class="btn-refresh" onclick="loadTickets()">Recargar Tickets</button>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="ticketsTable">
+          <tr><td colspan="3">Cargando tickets...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+
+    function showResult(message, isError = false) {
+      const el = document.getElementById('result');
+      el.style.display = 'block';
+      el.className = isError ? 'error' : 'success';
+      el.textContent = message;
+    }
+
+    async function createTicket() {
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+
+      if (!title || !description) {
+        showResult('Completa título y descripción', true);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/tickets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description })
+        });
+        const data = await res.json();
+        showResult(`Ticket #${data.id} creado. Evento enviado a Kafka.`);
+        loadTickets();
+        setTimeout(loadEvents, 1000);
+      } catch (err) {
+        showResult('Error: ' + err.message, true);
+      }
+    }
+
+    async function updateStatus() {
+      const id = document.getElementById('ticketId').value;
+      const status = document.getElementById('status').value;
+
+      if (!id) {
+        showResult('Ingresa un ID de ticket', true);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/tickets/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        showResult(`Ticket #${data.id} actualizado a "${status}". Evento enviado a Kafka.`);
+        loadTickets();
+        setTimeout(loadEvents, 1000);
+      } catch (err) {
+        showResult('Error: ' + err.message, true);
+      }
+    }
+
+    async function loadEvents() {
+      try {
+        const res = await fetch(`${API}/events`);
+        const events = await res.json();
+        const tbody = document.getElementById('eventsTable');
+
+        if (events.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4">No hay eventos aún. Crea un ticket primero.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = events.map(e => `
+          <tr>
+            <td>${e.id}</td>
+            <td>${e.event_type}</td>
+            <td>#${e.ticket_id}</td>
+            <td>${new Date(e.processed_at).toLocaleString()}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        document.getElementById('eventsTable').innerHTML = '<tr><td colspan="4">Error cargando eventos</td></tr>';
+      }
+    }
+
+    async function loadTickets() {
+      try {
+        const res = await fetch(`${API}/tickets`);
+        const tickets = await res.json();
+        const tbody = document.getElementById('ticketsTable');
+
+        tbody.innerHTML = tickets.map(t => `
+          <tr>
+            <td>${t.id}</td>
+            <td>${t.title}</td>
+            <td class="status-${t.status}">${t.status}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        document.getElementById('ticketsTable').innerHTML = '<tr><td colspan="3">Error cargando tickets</td></tr>';
+      }
+    }
+
+    loadTickets();
+    loadEvents();
+  </script>
+</body>
+</html>

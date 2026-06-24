@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const { connectProducer, publishEvent } = require('./kafka/producer');
 require('dotenv').config();
 
 const app = express();
@@ -67,7 +68,13 @@ app.post('/tickets', async (req, res) => {
     [title, description]
   );
 
-  res.status(201).json(result.rows[0]);
+  const ticket = result.rows[0];
+  await publishEvent('ticket-events', {
+    event: 'TICKET_CREATED',
+    data: ticket,
+  });
+
+  res.status(201).json(ticket);
 });
 
 app.put('/tickets/:id/status', async (req, res) => {
@@ -88,11 +95,31 @@ app.put('/tickets/:id/status', async (req, res) => {
     return res.status(404).json({ message: 'Ticket not found' });
   }
 
-  res.json(result.rows[0]);
+  const ticket = result.rows[0];
+  await publishEvent('ticket-events', {
+    event: 'TICKET_STATUS_CHANGED',
+    data: ticket,
+  });
+
+  res.json(ticket);
+});
+
+app.get('/events', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM event_logs ORDER BY id DESC LIMIT 50');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching events', error: error.message });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/test.html');
 });
 
 initializeDatabase()
-  .then(() => {
+  .then(async () => {
+    await connectProducer();
     app.listen(port, '0.0.0.0', () => {
       console.log(`HelpDesk backend running on port ${port}`);
     });
